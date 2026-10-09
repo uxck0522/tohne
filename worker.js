@@ -586,3 +586,52 @@ async function logout(){
 </script>
 </body>
 </html>`;
+# TOHNE — Personal EdgeTunnel-style panel
+
+Dark dashboard for managing node metadata, individual users/UUIDs and subscription links on Cloudflare Workers + KV.
+
+## Important architecture note
+
+This project is a **control panel and subscription generator**, not a proxy data plane. A Cloudflare Worker does not automatically become a VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC server. Each node's server address and port must point to a separately deployed, working protocol server. `entryIP` and `exitIP` are labels/metadata; this panel cannot force a remote server's real egress IP to match the configured exit IP.
+
+## Features
+
+- Admin login with secrets stored in Cloudflare Worker environment variables
+- Dark responsive dashboard
+- Node create/edit/delete; enable/disable nodes
+- Separate entry IP and exit/landing IP fields
+- Protocol link generation: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC
+- Multi-user management, per-user UUID and subscription token
+- Base64 subscription endpoint: `/sub?token=...`
+- No npm dependencies
+
+## Deploy
+
+1. In Cloudflare Dashboard, create a Workers KV namespace (Workers & Pages → KV).
+2. Edit `wrangler.toml`, replace `REPLACE_WITH_YOUR_KV_NAMESPACE_ID` with the KV namespace ID. Or create/bind a namespace named `DATA` in the Worker settings.
+3. Set these Worker secrets/environment variables in **Settings → Variables and Secrets**:
+   - `ADMIN_USERNAME`: administrator login name
+   - `ADMIN_PASSWORD`: a strong unique password
+   - `SESSION_SECRET`: at least 32 random characters, used to sign login sessions
+   - `PUBLIC_BASE_URL`: full public Worker URL, e.g. `https://tohne.example.workers.dev` (optional but recommended)
+4. Deploy the project with Wrangler (`npx wrangler deploy`) or upload the files in the Cloudflare dashboard if your workflow supports it.
+5. Open the Worker URL and log in.
+
+For local development, copy `.dev.vars.example` to `.dev.vars`, fill in secrets, and use `npx wrangler dev`.
+
+## Usage
+
+1. Create a user under **用户与订阅**. The user receives an independent UUID and random subscription token.
+2. Create nodes under **节点管理**. `服务端入口地址` and `入口端口` must match the actual server endpoint. The separate `入口 IP` and `落地/出口 IP` fields are notes and do not configure routing by themselves.
+3. Copy the generated subscription URL and import it into a client that supports the relevant URI formats.
+
+## Protocol compatibility
+
+The panel emits URI-style links for the six listed protocol families. Exact support depends on the target client and server. Advanced options vary between clients; verify generated links against the client/server you actually use. XHTTP is exposed as a transport metadata option for compatible VLESS/VMess clients, but transport fields alone do not deploy or configure the server.
+
+## Security notes
+
+- Use HTTPS and a strong `ADMIN_PASSWORD` and `SESSION_SECRET`.
+- Do not share user subscription tokens publicly; anyone with a token can fetch that user's subscription.
+- KV is eventually consistent; do not use this simple starter panel as a billing/authorization enforcement system.
+- Before production use, add audit logs, rate limiting, backup/export, token rotation, and tests. The UI does not implement paid-user traffic cutoff or enforce quotas on remote servers.
